@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contact Makvion
+    url: https://makvion.com/contact
+    about: For general questions, project enquiries or support, reach us on the website.
+  - name: Email
+    url: mailto:contact@makvion.com
+    about: Write to contact@makvion.com for private or security-related matters.

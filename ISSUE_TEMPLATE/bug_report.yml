@@ -1,0 +1,50 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in every section you can.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+      placeholder: Tell us what you saw.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should have happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reproduce the issue.
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Browser, device, OS, or deployment details that matter.
+      placeholder: e.g. Chrome 130 on Android, production
+    validations:
+      required: false
+  - type: textarea
+    id: extras
+    attributes:
+      label: Screenshots or logs
+      description: Optional. Paste logs or describe screenshots.
+    validations:
+      required: false
