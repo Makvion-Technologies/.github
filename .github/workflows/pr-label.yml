@@ -16,7 +16,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
       - name: Label by path
-        uses: actions/labeler@v5
+        uses: actions/labeler@v7
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           sync-labels: false
