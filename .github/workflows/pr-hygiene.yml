@@ -40,9 +40,14 @@ jobs:
       - name: Require an issue link in the PR body
         env:
           BODY: ${{ github.event.pull_request.body }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           python3 << 'PY'
           import os, re, sys
+          author = os.environ.get("AUTHOR") or ""
+          if author.endswith("[bot]") or author in {"dependabot[bot]", "github-actions[bot]"}:
+              print(f"Skipping issue-link check for bot author {author}.")
+              sys.exit(0)
           body = os.environ.get("BODY") or ""
           # GitHub linking keywords, plus "Related to" used in this org
           pattern = re.compile(
