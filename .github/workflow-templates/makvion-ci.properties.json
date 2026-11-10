@@ -1,6 +1,6 @@
 {
   "name": "Makvion CI",
-  "description": "Runs install, lint, and build with the shared Makvion Node CI workflow. Adjust the commands to match the repo's package.json scripts.",
+  "description": "Installs Node dependencies and runs lint, typecheck, and build with the shared Makvion workflow. Adjust the commands to match the repo's package.json scripts.",
   "iconName": "nodejs",
   "categories": ["JavaScript", "TypeScript"],
   "filePatterns": ["package.json"]

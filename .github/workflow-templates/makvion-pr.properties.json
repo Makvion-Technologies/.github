@@ -1,0 +1,7 @@
+{
+  "name": "Makvion PR hygiene",
+  "description": "Checks the PR title (conventional commits), requires an issue link in the body, and blocks forbidden files. Warns on very large PRs.",
+  "iconName": "octicon-git-pull-request",
+  "categories": ["continuous-integration"],
+  "filePatterns": ["package.json"]
+}

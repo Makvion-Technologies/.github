@@ -1,0 +1,7 @@
+{
+  "name": "Makvion PR labels",
+  "description": "Labels a pull request by changed paths and assigns the author. Requires .github/labeler.yml in the repository.",
+  "iconName": "octicon-tag",
+  "categories": ["Automation"],
+  "filePatterns": [".github/labeler.yml"]
+}

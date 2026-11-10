@@ -1,0 +1,7 @@
+{
+  "name": "Makvion dependency review",
+  "description": "Reviews new and updated dependencies on pull requests and fails on high or critical vulnerabilities.",
+  "iconName": "shield",
+  "categories": ["Dependency management"],
+  "filePatterns": ["package.json"]
+}

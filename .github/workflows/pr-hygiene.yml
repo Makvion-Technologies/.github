@@ -1,0 +1,217 @@
+name: PR hygiene
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  title:
+    name: title
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Check PR title
+        uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            chore
+            refactor
+            style
+            test
+            ci
+            perf
+          subjectPattern: .+
+          disallowScopes: |
+            wip
+
+  issue:
+    name: issue
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require an issue link in the PR body
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 << 'PY'
+          import os, re, sys
+          body = os.environ.get("BODY") or ""
+          # GitHub linking keywords, plus "Related to" used in this org
+          pattern = re.compile(
+              r"(?i)(?:clos(?:e|es|ed)|fix(?:e[sd])?|resolv(?:e|es|ed)|related\s+to)"
+              r"(?:\s+)?(?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#\d+"
+              r"|"
+              r"https?://github\.com/[^/\s]+/[^/\s]+/issues/\d+"
+          )
+          if pattern.search(body):
+              print("Found an issue link in the pull request body.")
+              sys.exit(0)
+          print(
+              "::error::Please add a line like `Closes #12` or `Fixes #12` to the pull request description, "
+              "using the issue this work finishes. If this is only part of the work, use `Related to #12`. "
+              "Then update the description and the check will run again."
+          )
+          sys.exit(1)
+          PY
+
+  files:
+    name: files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Block forbidden or oversized files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          python3 << 'PY'
+          import json, os, subprocess, sys
+
+          repo = os.environ["REPO"]
+          pr = os.environ["PR"]
+          raw = subprocess.check_output(
+              ["gh", "api", "--paginate", f"repos/{repo}/pulls/{pr}/files"],
+              text=True,
+          )
+          # paginated output may be concatenated JSON arrays
+          raw = raw.strip()
+          files = []
+          if raw:
+              try:
+                  parsed = json.loads(raw)
+                  files = parsed if isinstance(parsed, list) else [parsed]
+              except json.JSONDecodeError:
+                  # concatenated arrays from --paginate
+                  decoder = json.JSONDecoder()
+                  idx = 0
+                  while idx < len(raw):
+                      while idx < len(raw) and raw[idx].isspace():
+                          idx += 1
+                      if idx >= len(raw):
+                          break
+                      obj, end = decoder.raw_decode(raw, idx)
+                      files.extend(obj if isinstance(obj, list) else [obj])
+                      idx = end
+
+          MAX = 5 * 1024 * 1024
+          problems = []
+
+          def reason(path: str):
+              base = path.rsplit("/", 1)[-1]
+              lower = path.lower()
+              if base in {"CLAUDE.md", "AGENTS.md"}:
+                  return "AI tool file — do not commit CLAUDE.md or AGENTS.md"
+              if base.startswith(".env") and base != ".env.example":
+                  return "environment file — never commit .env or .env.* (except .env.example)"
+              if lower.endswith((".pem", ".key", ".p12", ".pfx", ".p8")):
+                  return "private key or certificate"
+              if base in {"id_rsa", "id_dsa", "id_ecdsa", "id_ed25519"}:
+                  return "SSH private key"
+              if base.lower() in {"credentials.json", "credentials.yml", "credentials.yaml", "secrets.json", "secrets.yml", "secrets.yaml"}:
+                  return "credentials or secrets file"
+              return None
+
+          for f in files:
+              path = f.get("filename") or ""
+              status = f.get("status") or ""
+              if status == "removed":
+                  continue
+              why = reason(path)
+              if why:
+                  problems.append(f"- `{path}`: {why}")
+                  continue
+              sha = f.get("sha")
+              if not sha:
+                  continue
+              try:
+                  blob = json.loads(subprocess.check_output(
+                      ["gh", "api", f"repos/{repo}/git/blobs/{sha}"],
+                      text=True,
+                  ))
+                  size = int(blob.get("size") or 0)
+              except Exception as e:
+                  print(f"Could not read size for {path}: {e}", file=sys.stderr)
+                  continue
+              if size > MAX:
+                  mb = size / (1024 * 1024)
+                  problems.append(f"- `{path}`: file is {mb:.1f} MB (limit 5 MB)")
+
+          if problems:
+              print("::error::This pull request adds or changes files that are not allowed:")
+              for p in problems:
+                  print(p)
+              print("Remove them from the branch (and from git history if they were ever committed) and ask your lead if a secret may have been exposed.")
+              sys.exit(1)
+          print(f"Checked {len(files)} file(s). No forbidden or oversized files.")
+          PY
+
+  size:
+    name: size
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - name: Warn on very large PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          python3 << 'PY'
+          import json, os, subprocess
+
+          repo = os.environ["REPO"]
+          pr = os.environ["PR"]
+          data = json.loads(subprocess.check_output(
+              ["gh", "api", f"repos/{repo}/pulls/{pr}"], text=True
+          ))
+          changed = int(data.get("additions") or 0) + int(data.get("deletions") or 0)
+          print(f"Changed lines (additions + deletions): {changed}")
+          if changed <= 800:
+              # Drop the label if the PR shrank
+              subprocess.run(
+                  ["gh", "api", "-X", "DELETE",
+                   f"repos/{repo}/issues/{pr}/labels/size%2FXL"],
+                  check=False, capture_output=True,
+              )
+              print("PR is within size. No warning.")
+              raise SystemExit(0)
+
+          subprocess.run(
+              ["gh", "api", "-X", "POST", f"repos/{repo}/issues/{pr}/labels",
+               "--input", "-"],
+              input=json.dumps({"labels": ["size/XL"]}),
+              text=True, check=False, capture_output=True,
+          )
+          comments = json.loads(subprocess.check_output(
+              ["gh", "api", "--paginate", f"repos/{repo}/issues/{pr}/comments"],
+              text=True,
+          ) or "[]")
+          marker = "<!-- makvion-size-xl -->"
+          already = any(marker in (c.get("body") or "") for c in comments)
+          if already:
+              print("Already commented on this large PR.")
+              raise SystemExit(0)
+          body = (
+              f"{marker}\n"
+              f"This pull request changes **{changed} lines**, which is over our 800-line guide for a comfortable review. "
+              f"It is not blocked, but please consider splitting it into smaller PRs if you can. "
+              f"The `size/XL` label was added so the reviewer can see this at a glance."
+          )
+          subprocess.run(
+              ["gh", "api", "-X", "POST", f"repos/{repo}/issues/{pr}/comments",
+               "--input", "-"],
+              input=json.dumps({"body": body}),
+              text=True, check=True,
+          )
+          print("Commented and labeled size/XL.")
+          PY
