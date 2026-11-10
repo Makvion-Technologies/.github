@@ -87,7 +87,7 @@ jobs:
 
       - name: Set up pnpm
         if: steps.pkg.outputs.manager == 'pnpm'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Enable Yarn
         if: steps.pkg.outputs.manager == 'yarn'
