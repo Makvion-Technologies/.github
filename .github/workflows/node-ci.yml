@@ -51,7 +51,7 @@ jobs:
       NEXT_PUBLIC_STRIPE_LINK: ""
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Detect package manager
         id: pkg
